@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="fa">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard — Cloud–IoT–5G–PV–MPPT (Admin All-in-One)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  
+  <style>
+    :root{--bg:#071427;--card:#0b1220;--muted:#9aa4b2;--accent:#06b6d4;--white:#e6eef6}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    body{background:linear-gradient(180deg,#071427 0%, #081226 100%);color:var(--white);-webkit-font-smoothing:antialiased}
+    header{position:sticky;top:0;background:rgba(2,6,23,0.9);padding:12px 18px;display:flex;gap:18px;align-items:center;z-index:40;border-bottom:1px solid rgba(255,255,255,0.03)}
+    #header-left{display:flex;gap:12px;align-items:center}
+    #status-dot{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:8px;background:#7f8a97}
+    #header-right{margin-left:auto;display:flex;gap:10px;align-items:center;color:var(--muted);font-size:14px}
+    main{padding:16px;display:flex;flex-direction:column;gap:14px}
+    .tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+    .tile{background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));padding:14px;border-radius:10px;min-height:120px;box-shadow:0 6px 18px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.02)}
+    .tile h3{margin:0 0 8px 0;font-size:14px;color:var(--accent)}
+    .tile .k{font-weight:600;font-size:14px;color:var(--white)}
+    .panel{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.02)}
+    .panels-grid{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    button{background:var(--accent);border:none;color:#052025;padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:600}
+    input,select{padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--white)}
+    table{width:100%;border-collapse:collapse;color:var(--white);font-size:13px}
+    table th,table td{padding:6px;border-bottom:1px dashed rgba(255,255,255,0.03);text-align:left}
+    .small{font-size:12px;color:var(--muted)}
+    canvas{width:100%!important;height:200px!important}
+    .download-row{display:flex;gap:8px;align-items:center;margin-left:8px}
+    @media (max-width:1100px){.tiles{grid-template-columns:repeat(2,1fr)} .panels-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header>
+    <div id="header-left">
+      <div id="status-dot" title="system status" aria-hidden="true"></div>
+      <div>
+        <div style="font-weight:700" id="status-text">Offline</div>
+        <div class="small" id="sim-time">Time: --</div>
+      </div>
+      <div style="margin-left:12px">
+        <div class="small">Model:</div>
+        <div class="k">Cloud-based AI-Driven MPPT System</div>
+      </div>
+      <div style="margin-left:12px">
+        <div class="small">Scenario:</div>
+        <div id="scenario" class="k">--</div>
+      </div>
+      <div style="margin-left:12px">
+        <div class="small">Node:</div>
+        <div id="node-selected" class="k">--</div>
+      </div>
+    </div>
+
+    <div id="header-right">
+      <div class="small">Admin All-in-One</div>
+      <div class="download-row">
+        <button id="download-node">Download server.js (Node)</button>
+        <button id="download-python">Download app.py (FastAPI)</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="tiles" aria-label="system overview">
+      <div class="tile" id="pv-power-tile">
+        <h3>PV & Power</h3>
+        <div class="k" id="power">Power: --</div>
+        <div class="small" id="powerai">PowerAI: --</div>
+        <div class="small" id="effidx">EffIdx: --</div>
+        <canvas id="power-chart"></canvas>
+      </div>
+
+      <div class="tile" id="mppt-layer-tile">
+        <h3>MPPT Layer</h3>
+        <div class="k" id="mppt-algo">Algorithm: --</div>
+        <div class="small" id="mode-out">Mode_out: --</div>
+        <div class="small" id="mppt-cost">MPPT Cost: --</div>
+      </div>
+
+      <div class="tile" id="iot-network-tile">
+        <h3>IoT Network</h3>
+        <div class="k" id="delay-node">Delay_Node1: --</div>
+        <div class="small" id="ploss-node">PacketLoss_Node1: --</div>
+        <div class="small" id="snr-node">SNR_Node1: --</div>
+      </div>
+
+      <div class="tile" id="5g-network-tile">
+        <h3>5G Network</h3>
+        <div class="k" id="delay-5g">Delay5G_NodeX: --</div>
+        <div class="small" id="snr-5g">SNR_5G: --</div>
+        <div class="small" id="mcs">MCS: --</div>
+        <div class="small" id="throughput">Throughput: --</div>
+      </div>
+
+      <div class="tile" id="cloud-intel-tile">
+        <h3>Cloud Intelligence</h3>
+        <div class="k" id="qosidx">QoSIdx: --</div>
+        <div class="small" id="perfscore">PerfScore: --</div>
+        <div class="small" id="faultcode">FaultCode: --</div>
+        <div class="small" id="anomaly">Anomaly: --</div>
+      </div>
+    </section>
+
+    <section class="panels-grid" aria-label="main panels">
+      <div>
+        <div class="panel" id="communication-panel">
+          <h3>Communication Layer Panel</h3>
+          <div class="small">IoT metrics: Delay | PacketLoss | SNR | EnergyEff | Throughput | Retry</div>
+          <canvas id="delay-chart"></canvas>
+          <canvas id="snr-chart" style="margin-top:8px"></canvas>
+          <canvas id="ploss-chart" style="margin-top:8px"></canvas>
+        </div>
+
+        <div class="panel" id="mppt-control-panel" style="margin-top:12px">
+          <h3>MPPT & Control Panel</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label class="small">MPPT Algorithm:</label>
+            <select id="mppt-select"><option>ANN</option><option>SVM</option><option>P&O</option></select>
+            <button id="manual-override">Manual Override</button>
+            <input id="testid-input" placeholder="TestID" />
+            <div class="controls" style="margin-left:auto">
+              <button id="start-sim">Start</button>
+              <button id="stop-sim">Stop</button>
+              <button id="reset-model">Reset Model</button>
+            </div>
+          </div>
+          <canvas id="eff-chart" style="margin-top:10px;height:160px"></canvas>
+        </div>
+
+        <div class="panel" id="fault-panel" style="margin-top:12px">
+          <h3>Fault & Anomaly Center</h3>
+          <canvas id="fault-timeline"></canvas>
+          <canvas id="fault-pie" style="margin-top:8px;height:120px"></canvas>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+            <div class="small">Anomaly Gauge:</div>
+            <div id="anomaly-gauge" class="k">--</div>
+          </div>
+          <table aria-label="events" style="margin-top:8px">
+            <thead><tr><th>Time</th><th>Node</th><th>Fault</th><th>Algorithm</th><th>QoS</th><th>Efficiency</th></tr></thead>
+            <tbody id="events-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel" id="cloud-analytics">
+          <h3>Cloud Analytics Panel</h3>
+          <div class="small">PerfScore / QoS Index / Stability / Efficiency</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <div class="k" id="perfscore-side">PerfScore: --</div>
+            <div class="k" id="qosindex-side">QoSIdx: --</div>
+          </div>
+          <canvas id="radar-chart" style="margin-top:8px;height:200px"></canvas>
+          <canvas id="scatter-chart" style="margin-top:8px;height:200px"></canvas>
+        </div>
+
+        <div class="panel" id="kpi-panel" style="margin-top:12px">
+          <h3>KPI Summary & Reports</h3>
+          <div class="small">Table of test results (link to Excel), charts and export buttons</div>
+          <div style="margin-top:8px">
+            <button id="export-report">Export Report</button>
+            <button id="download-results">Download Results</button>
+          </div>
+          <div id="kpi-charts" style="margin-top:8px">
+            <canvas id="kpi-bar" style="height:160px"></canvas>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:12px">
+          <h3>Sensitivity & What-If</h3>
+          <div class="small">Heatmap thresholds | False Alarm Rate | Detection Rate</div>
+          <div style="margin-top:8px">
+            <div class="small">Eff_thr <input type="range" id="eff_thr" min="0" max="1" step="0.01" /></div>
+            <div class="small">QoS_thr <input type="range" id="qos_thr" min="0" max="1" step="0.01" /></div>
+            <div class="small">Fault_thr <input type="range" id="fault_thr" min="0" max="1" step="0.01" /></div>
+          </div>
+          <h3 style="margin-top:12px">Settings</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label class="small">Sampling Rate</label><input id="sampling-rate" placeholder="e.g., 1s" />
+            <label class="small">Mode Cloud</label>
+            <select id="mode-cloud"><option>Learning</option><option>Static</option></select>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <button id="reset-logs">Reset logs</button>
+            <button id="clear-db">Clear database</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  /* ADMIN ALL-IN-ONE SCRIPT
+     - No Persian comments in code.
+     - No fake telemetry generated.
+     - Worker acts as local processing/decision engine inside browser.
+     - Buttons to download server files (Node and Python) are provided.
+  */
+
+  // Configuration: set to actual backend if you have one.
+  const API_BASE = '';   // example '/iot/api' if using a server proxy
+  const WS_BASE  = '';   // example '/iot/ws' for backend websocket
+
+  // UI helpers
+  function setOnline(online){
+    const dot = document.getElementById('status-dot');
+    const txt = document.getElementById('status-text');
+    if(online){ dot.style.background = '#22c55e'; txt.textContent = 'Online'; }
+    else { dot.style.background = '#7f8a97'; txt.textContent = 'Offline'; }
+    document.getElementById('sim-time').textContent = 'Time: ' + new Date().toLocaleString();
+  }
+
+  // Chart placeholders
+  let powerChart, delayChart, snrChart, plossChart, effChart, radarChart, scatterChart, faultPie, kpiBar;
+  function initCharts(){
+    const ctxPower = document.getElementById('power-chart').getContext('2d');
+    powerChart = new Chart(ctxPower, {type:'line',data:{labels:[],datasets:[{label:'Power (W)',data:[],tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:false}}}});
+    const ctxDelay = document.getElementById('delay-chart').getContext('2d');
+    delayChart = new Chart(ctxDelay, {type:'line',data:{labels:[],datasets:[{label:'Delay(ms)',data:[],tension:0.4}]},options:{plugins:{legend:{display:false}}}});
+    const ctxSnr = document.getElementById('snr-chart').getContext('2d');
+    snrChart = new Chart(ctxSnr, {type:'line',data:{labels:[],datasets:[{label:'SNR(dB)',data:[],tension:0.4}]},options:{plugins:{legend:{display:false}}}});
+    const ctxPloss = document.getElementById('ploss-chart').getContext('2d');
+    plossChart = new Chart(ctxPloss, {type:'line',data:{labels:[],datasets:[{label:'PacketLoss(%)',data:[],tension:0.4}]},options:{plugins:{legend:{display:false}}}});
+    const ctxEff = document.getElementById('eff-chart').getContext('2d');
+    effChart = new Chart(ctxEff, {type:'line',data:{labels:[],datasets:[{label:'Efficiency',data:[],tension:0.4}]},options:{plugins:{legend:{display:false}}}});
+    const ctxRadar = document.getElementById('radar-chart').getContext('2d');
+    radarChart = new Chart(ctxRadar, {type:'radar',data:{labels:['Perf','QoS','Stability','Efficiency'],datasets:[{label:'System Radar',data:[0,0,0,0]}]},options:{plugins:{legend:{display:false}}}});
+    const ctxScatter = document.getElementById('scatter-chart').getContext('2d');
+    scatterChart = new Chart(ctxScatter, {type:'scatter',data:{datasets:[]},options:{plugins:{legend:{display:false}}}});
+    const ctxFaultPie = document.getElementById('fault-pie').getContext('2d');
+    faultPie = new Chart(ctxFaultPie, {type:'pie',data:{labels:[],datasets:[{data:[]}]},options:{plugins:{legend:{position:'bottom'}}}});
+    const ctxKpi = document.getElementById('kpi-bar').getContext('2d');
+    kpiBar = new Chart(ctxKpi, {type:'bar',data:{labels:[],datasets:[]},options:{indexAxis:'y',plugins:{legend:{display:false}}}});
+  }
+
+  // Worker code as blob (acts as local processing/decision engine)
+  const workerCode = `
+self.telemetry_store = [];
+
+function scoreDecision(payload){
+  const s_iot = (payload.latency_iot != null) ? Math.max(0,100 - Number(payload.latency_iot)) * 0.4 + (Number(payload.snr_iot)||0)*0.6 + (Number(payload.throughput_iot)||0)*0.8 : 0;
+  const s_5g  = (payload.latency_5g != null) ? Math.max(0,100 - Number(payload.latency_5g)) * 0.4 + (Number(payload.snr_5g)||0)*0.6 + (Number(payload.throughput_5g)||0)*0.8 : 0;
+  const selected = s_5g > s_iot ? '5G' : 'IoT';
+  return { selected, scores: { iot: s_iot, '5g': s_5g } };
+}
+
+self.onmessage = async (ev) => {
+  const msg = ev.data || {};
+  const type = msg.type;
+  if(type === 'ingest'){
+    const payload = msg.payload || {};
+    payload._received = (new Date()).toISOString();
+    self.telemetry_store.push(payload);
+    self.postMessage({ type:'ingest_ack', ok:true, len:self.telemetry_store.length });
+    self.postMessage({ type:'telemetry_update', payload });
+  } else if(type === 'decide'){
+    const inpt = msg.payload || {};
+    const result = scoreDecision(inpt);
+    self.postMessage({ type:'decide_result', result, for: inpt.node_id || null });
+  } else if(type === 'clear_store'){
+    self.telemetry_store = [];
+    self.postMessage({ type:'cleared' });
+  } else if(type === 'start_ws'){
+    try{
+      if(self._ws) { self._ws.close(); self._ws = null; }
+      const url = msg.url;
+      if(!url) { self.postMessage({ type:'ws_error', error:'no url' }); return; }
+      self._ws = new WebSocket(url);
+      self._ws.onopen = () => { self.postMessage({ type:'ws_open' }); };
+      self._ws.onclose = () => { self.postMessage({ type:'ws_close' }); };
+      self._ws.onerror = (e) => { self.postMessage({ type:'ws_error', error: String(e) }); };
+      self._ws.onmessage = (wev) => {
+        try{
+          const payload = JSON.parse(wev.data);
+          self.telemetry_store.push(payload);
+          self.postMessage({ type:'telemetry_update', payload });
+        }catch(err){
+          self.postMessage({ type:'ws_msg_error', error: String(err) });
+        }
+      };
+    }catch(e){
+      self.postMessage({ type:'ws_error', error: String(e) });
+    }
+  } else if(type === 'stop_ws'){
+    if(self._ws){ self._ws.close(); self._ws = null; self.postMessage({ type:'ws_stopped' }); }
+  } else {
+    self.postMessage({ type:'unknown', received: msg });
+  }
+};
+`;
+
+  const blob = new Blob([workerCode], { type: 'application/javascript' });
+  const workerUrl = URL.createObjectURL(blob);
+  const worker = new Worker(workerUrl);
+
+  worker.onmessage = (e) => {
+    const m = e.data || {};
+    if(m.type === 'telemetry_update'){ if(window.handleTelemetry) window.handleTelemetry(m.payload); }
+    else if(m.type === 'decide_result'){
+      const selEl = document.getElementById('cloud-intel-tile');
+      if(selEl){
+        let el = document.getElementById('worker-selection');
+        if(!el){ el = document.createElement('div'); el.id = 'worker-selection'; el.className='small'; selEl.appendChild(el); }
+        el.textContent = 'Network selected: ' + m.result.selected;
+      }
+      console.log('Decision result from worker:', m.result);
+    } else {
+      console.debug('worker msg', m);
+    }
+  };
+
+  function workerIngest(payload){ worker.postMessage({ type:'ingest', payload }); }
+  function workerDecide(payload){ worker.postMessage({ type:'decide', payload }); }
+  function workerStartWS(url){ worker.postMessage({ type:'start_ws', url }); }
+  function workerStopWS(){ worker.postMessage({ type:'stop_ws' }); }
+  function workerClearStore(){ worker.postMessage({ type:'clear_store' }); }
+
+  // WebSocket client for direct backend connection (optional)
+  let frontendWS = null;
+  function connectFrontendWS(){
+    if(!WS_BASE) return;
+    try{
+      const url = WS_BASE.replace(/^http/,'ws') + '/telemetry/ws/telemetry';
+      frontendWS = new WebSocket(url);
+      frontendWS.onopen = ()=> setOnline(true);
+      frontendWS.onclose = ()=> { setOnline(false); setTimeout(connectFrontendWS,5000); };
+      frontendWS.onerror = (e)=> { console.error('WS error',e); frontendWS.close(); };
+      frontendWS.onmessage = (ev)=> {
+        try{ const payload = JSON.parse(ev.data); handleTelemetry(payload); }catch(err){ console.error('invalid ws message',err); }
+      };
+    }catch(e){ console.error('ws connect failed',e); }
+  }
+
+  // update UI and charts from telemetry payload
+  function handleTelemetry(payload){
+    if(!payload || typeof payload !== 'object') return;
+    const node = payload.node_id || (payload.data && payload.data.node);
+    if(node) document.getElementById('node-selected').textContent = node;
+    document.getElementById('sim-time').textContent = 'Time: ' + (payload.timestamp || new Date().toISOString());
+    const d = payload.data || payload.payload || {};
+    if('pv_power' in d) document.getElementById('power').textContent = 'Power: ' + d.pv_power;
+    if('powerAI' in d) document.getElementById('powerai').textContent = 'PowerAI: ' + d.powerAI;
+    if('effIdx' in d) document.getElementById('effidx').textContent = 'EffIdx: ' + d.effIdx;
+    if(d.mppt && typeof d.mppt === 'object'){
+      if(d.mppt.algo) document.getElementById('mppt-algo').textContent = 'Algorithm: ' + d.mppt.algo;
+      if(d.mppt.mode_out) document.getElementById('mode-out').textContent = 'Mode_out: ' + d.mppt.mode_out;
+      if('cost' in d.mppt) document.getElementById('mppt-cost').textContent = 'MPPT Cost: ' + d.mppt.cost;
+    }
+    if(d.iot && typeof d.iot === 'object'){
+      if('delay' in d.iot) document.getElementById('delay-node').textContent = 'Delay_Node1: ' + d.iot.delay;
+      if('packetLoss' in d.iot) document.getElementById('ploss-node').textContent = 'PacketLoss_Node1: ' + d.iot.packetLoss;
+      if('snr' in d.iot) document.getElementById('snr-node').textContent = 'SNR_Node1: ' + d.iot.snr;
+    }
+    if(d['5g'] && typeof d['5g'] === 'object'){
+      if('delay5g' in d['5g']) document.getElementById('delay-5g').textContent = 'Delay5G_NodeX: ' + d['5g'].delay5g;
+      if('snr5g' in d['5g']) document.getElementById('snr-5g').textContent = 'SNR_5G: ' + d['5g'].snr5g;
+      if('mcs' in d['5g']) document.getElementById('mcs').textContent = 'MCS: ' + d['5g'].mcs;
+      if('throughput' in d['5g']) document.getElementById('throughput').textContent = 'Throughput: ' + d['5g'].throughput;
+    }
+    if(d.cloud && typeof d.cloud === 'object'){
+      if('qosidx' in d.cloud) document.getElementById('qosidx').textContent = 'QoSIdx: ' + d.cloud.qosidx;
+      if('perfscore' in d.cloud) document.getElementById('perfscore').textContent = 'PerfScore: ' + d.cloud.perfscore;
+      if('faultcode' in d.cloud) document.getElementById('faultcode').textContent = 'FaultCode: ' + d.cloud.faultcode;
+      if('anomaly' in d.cloud) document.getElementById('anomaly').textContent = 'Anomaly: ' + d.cloud.anomaly;
+    }
+
+    const ts = payload.timestamp || new Date().toISOString();
+    function pushToChart(chart, label, value){
+      if(value === undefined || value === null || Number.isNaN(Number(value))) return;
+      chart.data.labels.push(label);
+      chart.data.datasets[0].data.push(Number(value));
+      if(chart.data.labels.length>200){ chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+      chart.update('none');
+    }
+    if('pv_power' in d) pushToChart(powerChart, ts, d.pv_power);
+    if(d.iot && 'delay' in d.iot) pushToChart(delayChart, ts, d.iot.delay);
+    if(d.iot && 'snr' in d.iot) pushToChart(snrChart, ts, d.iot.snr);
+    if(d.iot && 'packetLoss' in d.iot) pushToChart(plossChart, ts, d.iot.packetLoss);
+    if('effIdx' in d) pushToChart(effChart, ts, d.effIdx);
+
+    try{
+      if(d.cloud && ('perfscore' in d.cloud || 'qosidx' in d.cloud || 'stability' in d.cloud || 'efficiency' in d.cloud)){
+        radarChart.data.datasets[0].data = [
+          d.cloud.perfscore || 0,
+          d.cloud.qosidx  || 0,
+          d.cloud.stability || 0,
+          d.cloud.efficiency || d.cloud.eff || d.effIdx || 0
+        ];
+        radarChart.update('none');
+      }
+    }catch(e){ console.warn(e); }
+
+    if(Array.isArray(d.faults) && d.faults.length>0){
+      const tbody = document.getElementById('events-tbody');
+      d.faults.forEach(f=>{
+        const tr = document.createElement('tr');
+        const t0 = document.createElement('td'); t0.textContent = f.time || ts; tr.appendChild(t0);
+        const t1 = document.createElement('td'); t1.textContent = node || f.node || '--'; tr.appendChild(t1);
+        const t2 = document.createElement('td'); t2.textContent = f.fault || f.fault_code || '--'; tr.appendChild(t2);
+        const t3 = document.createElement('td'); t3.textContent = f.algo || '--'; tr.appendChild(t3);
+        const t4 = document.createElement('td'); t4.textContent = f.qos ?? '--'; tr.appendChild(t4);
+        const t5 = document.createElement('td'); t5.textContent = f.eff ?? '--'; tr.appendChild(t5);
+        tbody.prepend(tr);
+      });
+
+      const counts = {};
+      d.faults.forEach(f=>{ const k = f.fault || f.fault_code || 'unknown'; counts[k] = (counts[k]||0) + 1; });
+      faultPie.data.labels = Object.keys(counts);
+      faultPie.data.datasets[0].data = Object.values(counts);
+      faultPie.update('none');
+    }
+
+    if(Array.isArray(d.scatter) && d.scatter.length>0){
+      scatterChart.data.datasets = [{
+        label:'Fault vs QoS vs Eff',
+        data: d.scatter.map(it=>({x:it.qos,y:it.eff,r:3}))
+      }];
+      scatterChart.update('none');
+    }
+
+    if(d.kpis && typeof d.kpis === 'object'){
+      kpiBar.data.labels = Object.keys(d.kpis);
+      kpiBar.data.datasets = [{label:'KPI',data:Object.values(d.kpis)}];
+      kpiBar.update('none');
+    }
+  }
+
+  // REST helper (when API_BASE configured)
+  async function postAction(path, body){
+    if(!API_BASE){ alert('API_BASE not configured. Edit API_BASE in the HTML to point to your backend.'); return; }
+    const url = API_BASE + path;
+    try{
+      const res = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify(body)});
+      return await res.json();
+    }catch(err){ console.error('postAction fail',err); throw err; }
+  }
+
+  // UI event bindings
+  document.addEventListener('DOMContentLoaded', ()=> {
+    initCharts();
+    if(WS_BASE) connectFrontendWS();
+
+    document.getElementById('start-sim').addEventListener('click', async ()=>{
+      const testid = document.getElementById('testid-input').value || 'manual';
+      if(API_BASE) {
+        try{ const res = await postAction('/admin/start', {test_id:testid}); console.info('start res',res); }catch(e){ console.warn('start failed'); }
+      } else {
+        alert('No API_BASE configured. Use worker to emulate decide if needed.');
+      }
+    });
+
+    document.getElementById('stop-sim').addEventListener('click', async ()=>{
+      if(API_BASE) { try{ await postAction('/admin/stop', {}); }catch(e){ console.warn('stop failed'); } }
+      else alert('No API_BASE configured.');
+    });
+
+    document.getElementById('reset-model').addEventListener('click', async ()=>{
+      if(API_BASE){ try{ await postAction('/admin/reset_model', {}); }catch(e){ console.warn('reset model failed'); } }
+      else { workerClearStore(); alert('Local worker store cleared'); }
+    });
+
+    document.getElementById('export-report').addEventListener('click', async ()=>{
+      const testid = document.getElementById('testid-input').value || '';
+      if(!API_BASE){ alert('API_BASE not configured'); return; }
+      if(!testid){ alert('Enter TestID to export'); return; }
+      const url = API_BASE + '/admin/download/report/' + encodeURIComponent(testid);
+      window.open(url, '_blank');
+    });
+
+    document.getElementById('download-results').addEventListener('click', async ()=>{
+      if(!API_BASE){ alert('API_BASE not configured'); return; }
+      const url = API_BASE + '/admin/tests';
+      window.open(url, '_blank');
+    });
+
+    document.getElementById('clear-db').addEventListener('click', async ()=>{
+      if(!confirm('Clear database? This action may be destructive.')) return;
+      if(API_BASE){ try{ await postAction('/admin/clear_db', {}); alert('clear requested'); }catch(e){ alert('clear failed'); } }
+      else { workerClearStore(); alert('Local worker store cleared'); }
+    });
+
+    document.getElementById('reset-logs').addEventListener('click', async ()=>{
+      if(API_BASE){ try{ await postAction('/admin/reset_logs', {}); alert('reset logs requested'); }catch(e){ alert('reset logs failed'); } }
+      else { alert('No server configured. Use local worker for testing.'); }
+    });
+
+    document.getElementById('manual-override').addEventListener('click', async ()=>{
+      const algo = document.getElementById('mppt-select').value;
+      if(API_BASE){ try{ await postAction('/admin/manual_override', {algorithm:algo}); alert('Override requested'); }catch(e){ alert('override failed'); } }
+      else { alert('No server configured. Manual override local only.'); }
+    });
+
+    document.getElementById('mppt-select').addEventListener('change', ()=>{ /* no-op */ });
+
+    // download server file buttons
+    document.getElementById('download-node').addEventListener('click', ()=> downloadServerFiles('node'));
+    document.getElementById('download-python').addEventListener('click', ()=> downloadServerFiles('python'));
+  });
+
+  // Function to create downloadable server files (Node and Python)
+  function downloadServerFiles(kind){
+    if(kind === 'node'){
+      const nodeCode = `
+// Simple Node server with Express and WebSocket for telemetry and decision endpoint
+// No authentication. Configure as needed for production.
+const express = require('express');
+const bodyParser = require('body-parser');
+const http = require('http');
+const WebSocket = require('ws');
+
+const app = express();
+app.use(bodyParser.json());
+
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+let telemetryStore = [];
+
+// Decision logic placeholder; replace with ANN inference if available
+function scoreDecision(payload){
+  const s_iot = (payload.latency_iot != null) ? Math.max(0,100 - Number(payload.latency_iot)) * 0.4 + (Number(payload.snr_iot)||0)*0.6 + (Number(payload.throughput_iot)||0)*0.8 : 0;
+  const s_5g  = (payload.latency_5g != null) ? Math.max(0,100 - Number(payload.latency_5g)) * 0.4 + (Number(payload.snr_5g)||0)*0.6 + (Number(payload.throughput_5g)||0)*0.8 : 0;
+  const selected = s_5g > s_iot ? '5G' : 'IoT';
+  return { selected, scores: { iot: s_iot, '5g': s_5g } };
+}
+
+app.post('/api/telemetry/ingest', (req, res) => {
+  const payload = req.body || {};
+  payload._received = new Date().toISOString();
+  telemetryStore.push(payload);
+  // broadcast to websocket clients
+  const msg = JSON.stringify(payload);
+  wss.clients.forEach(client => {
+    if(client.readyState === WebSocket.OPEN) client.send(msg);
+  });
+  res.json({ stored: true, len: telemetryStore.length });
+});
+
+app.post('/api/decide', (req, res) => {
+  const inpt = req.body || {};
+  const result = scoreDecision(inpt);
+  res.json({ node: inpt.node_id || null, selected: result.selected, scores: result.scores });
+});
+
+// simple endpoints for admin actions
+app.post('/admin/start', (req, res) => { res.json({ started: true }); });
+app.post('/admin/stop', (req, res) => { res.json({ stopped: true }); });
+
+wss.on('connection', (ws) => {
+  console.log('ws client connected');
+  ws.on('message', (msg) => {
+    // no-op: server receives
+  });
+});
+
+const PORT = process.env.PORT || 8000;
+server.listen(PORT, () => console.log('Node server listening on', PORT));
+`;
+      const blob = new Blob([nodeCode], { type: 'text/javascript' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'server.js';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } else if(kind === 'python'){
+      const pyCode = `
+# Simple FastAPI server for telemetry and decision endpoint
+# No authentication. Configure as needed for production.
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
+import uvicorn
+
+app = FastAPI()
+telemetry_store = []
+
+class DecideIn(BaseModel):
+    node_id: str = None
+    latency_iot: float = None
+    snr_iot: float = None
+    throughput_iot: float = None
+    latency_5g: float = None
+    snr_5g: float = None
+    throughput_5g: float = None
+
+def score_decision(payload: DecideIn):
+    s_iot = (payload.latency_iot is not None) and max(0,100 - payload.latency_iot) * 0.4 + (payload.snr_iot or 0)*0.6 + (payload.throughput_iot or 0)*0.8 or 0
+    s_5g = (payload.latency_5g is not None) and max(0,100 - payload.latency_5g) * 0.4 + (payload.snr_5g or 0)*0.6 + (payload.throughput_5g or 0)*0.8 or 0
+    selected = '5G' if s_5g > s_iot else 'IoT'
+    return {'selected': selected, 'scores': {'iot': s_iot, '5g': s_5g}}
+
+@app.post('/api/telemetry/ingest')
+async def ingest(payload: dict):
+    payload['_received'] = __import__('datetime').datetime.utcnow().isoformat()
+    telemetry_store.append(payload)
+    return {'stored': True, 'len': len(telemetry_store)}
+
+@app.post('/api/decide')
+async def decide(inpt: DecideIn):
+    result = score_decision(inpt)
+    return {'node': inpt.node_id, 'selected': result['selected'], 'scores': result['scores']}
+
+@app.post('/admin/start')
+async def start_sim(body: dict = {}):
+    return {'started': True}
+
+@app.post('/admin/stop')
+async def stop_sim(body: dict = {}):
+    return {'stopped': True}
+
+if __name__ == '__main__':
+    uvicorn.run('app:app', host='0.0.0.0', port=8000, reload=False)
+`;
+      const blob = new Blob([pyCode], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'app.py';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+  }
+
+  // Initialize small local behavior: no fake data created
+  document.addEventListener('DOMContentLoaded', ()=> {
+    initCharts();
+    setOnline(false);
+  });
+
+  // Expose workerDecide for console usage if needed
+  window.workerDecide = workerDecide;
+  window.workerIngest = workerIngest;
+  window.workerStartWS = workerStartWS;
+  window.workerStopWS = workerStopWS;
+
+  </script>
+</body>
+</html>
+<scrip src=./server.js>
+</scrip>
