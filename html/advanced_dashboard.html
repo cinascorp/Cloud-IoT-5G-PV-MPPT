@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud-IoT-5G-PV-MPPT Advanced Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.5.4/dist/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #0066cc;
+            --secondary-color: #00cc66;
+            --danger-color: #ff3333;
+            --warning-color: #ff9900;
+            --info-color: #00ccff;
+            --success-color: #00ff66;
+            --dark-bg: #0a0e27;
+            --card-bg: #1a1f3a;
+            --border-color: #2a3550;
+            --text-primary: #e0e6ff;
+            --text-secondary: #a0aac0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .dashboard-container {
+            max-width: 1920px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(90deg, #0066cc 0%, #00cc66 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 102, 204, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-status {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.online {
+            background-color: var(--success-color);
+            box-shadow: 0 0 10px var(--success-color);
+        }
+
+        .status-dot.offline {
+            background-color: var(--danger-color);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .timestamp {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .dashboard-grid-large {
+            grid-column: 1 / -1;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 48px rgba(0, 102, 204, 0.2);
+            border-color: var(--primary-color);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 204, 102, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .card:hover::before {
+            left: 100%;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-icon {
+            font-size: 1.5em;
+        }
+
+        .card-status {
+            font-size: 0.8em;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .status-good {
+            background: rgba(0, 255, 102, 0.2);
+            color: var(--success-color);
+        }
+
+        .status-warning {
+            background: rgba(255, 153, 0, 0.2);
+            color: var(--warning-color);
+        }
+
+        .status-critical {
+            background: rgba(255, 51, 51, 0.2);
+            color: var(--danger-color);
+        }
+
+        /* Metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+
+        .metric {
+            background: rgba(0, 102, 204, 0.1);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .metric:hover {
+            background: rgba(0, 102, 204, 0.2);
+            border-color: var(--primary-color);
+        }
+
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: var(--secondary-color);
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-unit {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        /* Charts */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+
+        .chart-container-large {
+            height: 400px;
+        }
+
+        /* Real-time Data Section */
+        .real-time-data {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .data-point {
+            background: linear-gradient(135deg, rgba(0, 102, 204, 0.1) 0%, rgba(0, 204, 102, 0.1) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .data-label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        .data-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--info-color);
+        }
+
+        /* Network Metrics */
+        .network-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(0, 204, 255, 0.1);
+            border-radius: 6px;
+            border-left: 3px solid var(--info-color);
+        }
+
+        .signal-bars {
+            display: flex;
+            gap: 3px;
+        }
+
+        .bar {
+            width: 4px;
+            height: 12px;
+            background: var(--text-secondary);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .bar.active {
+            background: var(--info-color);
+            height: 100%;
+        }
+
+        /* MPPT Control */
+        .control-group {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--danger-color), var(--warning-color), var(--success-color));
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 102, 204, 0.5);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px rgba(0, 102, 204, 0.5);
+        }
+
+        /* Buttons */
+        button {
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 102, 204, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: linear-gradient(90deg, var(--warning-color), var(--danger-color));
+        }
+
+        /* Fault Detection */
+        .fault-alert {
+            background: rgba(255, 51, 51, 0.1);
+            border-left: 4px solid var(--danger-color);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .fault-alert.warning {
+            background: rgba(255, 153, 0, 0.1);
+            border-left-color: var(--warning-color);
+        }
+
+        .fault-alert.info {
+            background: rgba(0, 204, 255, 0.1);
+            border-left-color: var(--info-color);
+        }
+
+        .fault-message {
+            flex: 1;
+        }
+
+        .fault-time {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+        }
+
+        .fault-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.5em;
+            padding: 0;
+            margin: 0;
+        }
+
+        /* Analytics */
+        .analytics-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, rgba(0, 102, 204, 0.05) 0%, rgba(0, 204, 102, 0.05) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-change {
+            font-size: 0.85em;
+            margin-top: 10px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .stat-change.up {
+            background: rgba(0, 255, 102, 0.2);
+            color: var(--success-color);
+        }
+
+        .stat-change.down {
+            background: rgba(255, 51, 51, 0.2);
+            color: var(--danger-color);
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: rgba(0, 102, 204, 0.1);
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid var(--border-color);
+            color: var(--secondary-color);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:hover {
+            background: rgba(0, 102, 204, 0.05);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .header-status {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--secondary-color);
+            animation: loading 1.4s infinite;
+            margin-left: 5px;
+        }
+
+        @keyframes loading {
+            0%, 100% { opacity: 0; transform: scale(0); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--card-bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
+        }
+
+        /* Alert Banner */
+        .alert-banner {
+            background: linear-gradient(90deg, rgba(255, 51, 51, 0.1), transparent);
+            border-left: 4px solid var(--danger-color);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alert-banner.success {
+            background: linear-gradient(90deg, rgba(0, 255, 102, 0.1), transparent);
+            border-left-color: var(--success-color);
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Section 1: Header & System Status -->
+        <header>
+            <div>
+                <h1>⚡ Cloud-IoT-5G-PV-MPPT Dashboard</h1>
+                <p style="font-size: 0.95em; margin-top: 10px; opacity: 0.9;">Advanced Real-Time System Monitoring & Control</p>
+            </div>
+            <div class="header-status">
+                <div class="status-indicator">
+                    <div class="status-dot online" id="systemStatus"></div>
+                    <span id="systemStatusText">System Online</span>
+                </div>
+                <div class="status-indicator">
+                    <span id="currentTime" class="timestamp">2025-12-17 13:43:19</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Section 2: Real-Time Power Metrics -->
+        <section class="dashboard-grid">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">⚡</span>
+                        Power Generation
+                    </div>
+                    <span class="card-status status-good" id="powerStatus">OPTIMAL</span>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <div class="metric-value" id="pvVoltage">385.2</div>
+                        <div class="metric-label">PV Voltage</div>
+                        <div class="metric-unit">V</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="pvCurrent">8.5</div>
+                        <div class="metric-label">PV Current</div>
+                        <div class="metric-unit">A</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="pvPower">3.27</div>
+                        <div class="metric-label">PV Power</div>
+                        <div class="metric-unit">kW</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="pvEfficiency">96.8</div>
+                        <div class="metric-label">Efficiency</div>
+                        <div class="metric-unit">%</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="powerChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Section 3: Inverter & Grid Metrics -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">🔄</span>
+                        Inverter Status
+                    </div>
+                    <span class="card-status status-good" id="inverterStatus">ACTIVE</span>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <div class="metric-value" id="gridVoltage">230.5</div>
+                        <div class="metric-label">Grid Voltage</div>
+                        <div class="metric-unit">V</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="gridFrequency">50.0</div>
+                        <div class="metric-label">Frequency</div>
+                        <div class="metric-unit">Hz</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="gridCurrent">14.2</div>
+                        <div class="metric-label">Grid Current</div>
+                        <div class="metric-unit">A</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="thd">2.8</div>
+                        <div class="metric-label">THD</div>
+                        <div class="metric-unit">%</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="inverterChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Section 4: Temperature & Environmental Monitoring -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">🌡️</span>
+                        Environmental Data
+                    </div>
+                    <span class="card-status status-good" id="tempStatus">NORMAL</span>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <div class="metric-value" id="panelTemp">52.3</div>
+                        <div class="metric-label">Panel Temp</div>
+                        <div class="metric-unit">°C</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="inverterTemp">38.5</div>
+                        <div class="metric-label">Inverter Temp</div>
+                        <div class="metric-unit">°C</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="irradiance">892</div>
+                        <div class="metric-label">Irradiance</div>
+                        <div class="metric-unit">W/m²</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="humidity">45</div>
+                        <div class="metric-label">Humidity</div>
+                        <div class="metric-unit">%</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="tempChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Network & 5G Connectivity Metrics -->
+        <section class="dashboard-grid">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">📡</span>
+                        Network Connectivity
+                    </div>
+                    <span class="card-status status-good" id="networkStatus">CONNECTED</span>
+                </div>
+                <div style="margin-top: 20px;">
+                    <div class="network-indicator">
+                        <span style="flex: 1;">5G Signal Strength</span>
+                        <div class="signal-bars">
+                            <div class="bar active" style="height: 8px;"></div>
+                            <div class="bar active" style="height: 12px;"></div>
+                            <div class="bar active" style="height: 16px;"></div>
+                            <div class="bar active" style="height: 20px;"></div>
+                        </div>
+                        <span style="margin-left: 10px;" id="rsrp">-95 dBm</span>
+                    </div>
+                    <div class="network-indicator">
+                        <span style="flex: 1;">Data Rate (DL)</span>
+                        <span id="dataRateDL">524 Mbps</span>
+                    </div>
+                    <div class="network-indicator">
+                        <span style="flex: 1;">Data Rate (UL)</span>
+                        <span id="dataRateUL">98 Mbps</span>
+                    </div>
+                    <div class="network-indicator">
+                        <span style="flex: 1;">Network Latency</span>
+                        <span id="latency">12.5 ms</span>
+                    </div>
+                    <div class="network-indicator">
+                        <span style="flex: 1;">Packet Loss</span>
+                        <span id="packetLoss">0.02%</span>
+                    </div>
+                    <div class="network-indicator">
+                        <span style="flex: 1;">RSRQ Quality</span>
+                        <span id="rsrq">-12 dB</span>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="networkChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Section 6: MPPT Control & Algorithm Status -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">🎯</span>
+                        MPPT Control System
+                    </div>
+                    <span class="card-status status-good" id="mpptStatus">TRACKING</span>
+                </div>
+                <div style="margin-top: 20px;">
+                    <div style="margin-bottom: 20px;">
+                        <div style="padding: 12px; background: rgba(0, 204, 102, 0.1); border-radius: 6px; border-left: 3px solid var(--secondary-color);">
+                            <div style="font-size: 0.9em; color: var(--text-secondary);">Algorithm Mode</div>
+                            <div style="font-size: 1.3em; font-weight: bold; margin-top: 5px;" id="mpptMode">Perturb & Observe</div>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Duty Cycle</span>
+                            <span id="dutyCycleValue">45.2%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="45.2" class="slider" id="dutyCycleSlider">
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Voltage Reference</span>
+                            <span id="voltageRefValue">385.2 V</span>
+                        </div>
+                        <input type="range" min="300" max="450" value="385.2" class="slider" id="voltageRefSlider">
+                    </div>
+                    <div style="margin-top: 20px; padding: 15px; background: rgba(0, 102, 204, 0.1); border-radius: 6px;">
+                        <div style="font-size: 0.9em; color: var(--text-secondary); margin-bottom: 8px;">MPP Tracking Statistics</div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Sampling Rate:</span>
+                            <strong>100 Hz</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Response Time:</span>
+                            <strong>245 ms</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Convergence Rate:</span>
+                            <strong>98.7%</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 7: Battery & Energy Storage -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">🔋</span>
+                        Energy Storage
+                    </div>
+                    <span class="card-status status-good" id="batteryStatus">CHARGING</span>
+                </div>
+                <div style="margin-top: 20px;">
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span style="color: var(--text-secondary);">SOC (State of Charge)</span>
+                            <strong id="socValue">78%</strong>
+                        </div>
+                        <div style="height: 20px; background: rgba(0, 0, 0, 0.3); border-radius: 10px; overflow: hidden;">
+                            <div id="socBar" style="width: 78%; height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                    <div class="metrics-grid" style="gap: 10px;">
+                        <div class="metric" style="padding: 10px;">
+                            <div class="metric-value" id="batteryVoltage" style="font-size: 1.5em;">48.5</div>
+                            <div class="metric-label" style="font-size: 0.8em;">Voltage</div>
+                            <div class="metric-unit">V</div>
+                        </div>
+                        <div class="metric" style="padding: 10px;">
+                            <div class="metric-value" id="batteryCurrent" style="font-size: 1.5em;">12.3</div>
+                            <div class="metric-label" style="font-size: 0.8em;">Current</div>
+                            <div class="metric-unit">A</div>
+                        </div>
+                        <div class="metric" style="padding: 10px;">
+                            <div class="metric-value" id="batteryCapacity" style="font-size: 1.5em;">5.95</div>
+                            <div class="metric-label" style="font-size: 0.8em;">Capacity</div>
+                            <div class="metric-unit">kWh</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="batteryChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 8: Fault Detection & Alerts -->
+        <section class="dashboard-grid dashboard-grid-large">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">⚠️</span>
+                        System Alerts & Fault Detection
+                    </div>
+                    <span class="card-status status-good" id="faultCount">0 Active</span>
+                </div>
+                <div id="alertContainer" style="max-height: 400px; overflow-y: auto;">
+                    <div class="fault-alert info">
+                        <div class="fault-message">
+                            <div style="font-weight: bold; margin-bottom: 3px;">System Initialized</div>
+                            <div class="fault-time">Started at 2025-12-17 13:43:19 UTC</div>
+                        </div>
+                        <button class="fault-close">×</button>
+                    </div>
+                    <div class="fault-alert success">
+                        <div class="fault-message">
+                            <div style="font-weight: bold; margin-bottom: 3px;">5G Connection Established</div>
+                            <div class="fault-time">Signal strength: -95 dBm | Data rate: 524 Mbps</div>
+                        </div>
+                        <button class="fault-close">×</button>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <button style="width: 100%; background: linear-gradient(90deg, #ff9900, #ff3333); margin: 0;">
+                        Clear All Alerts
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 9: Cloud Analytics & Performance Dashboard -->
+        <section class="dashboard-grid dashboard-grid-large">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">☁️</span>
+                        Cloud Analytics & Performance
+                    </div>
+                    <span class="card-status status-good">LIVE</span>
+                </div>
+                <div class="analytics-row">
+                    <div class="stat-box">
+                        <div class="stat-number" id="totalEnergy">1,247</div>
+                        <div class="stat-label">Total Energy Generated</div>
+                        <div class="stat-change up">↑ 12.3% vs Yesterday</div>
+                        <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 8px;">kWh</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="peakPower">3.45</div>
+                        <div class="stat-label">Peak Power Today</div>
+                        <div class="stat-change up">↑ 5.2% vs Average</div>
+                        <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 8px;">kW</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="avgEfficiency">96.5</div>
+                        <div class="stat-label">System Efficiency</div>
+                        <div class="stat-change up">↑ 2.1% vs Last Week</div>
+                        <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 8px;">%</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="uptime">99.87</div>
+                        <div class="stat-label">System Uptime</div>
+                        <div class="stat-change up">↑ 0.05% vs Target</div>
+                        <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 8px;">%</div>
+                    </div>
+                </div>
+                <div style="margin-top: 30px;">
+                    <h3 style="margin-bottom: 15px; font-size: 1.1em;">Daily Energy Production Trend</h3>
+                    <div class="chart-container chart-container-large">
+                        <canvas id="analyticsChart"></canvas>
+                    </div>
+                </div>
+                <div style="margin-top: 30px;">
+                    <h3 style="margin-bottom: 15px; font-size: 1.1em;">System Performance Log</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Power (kW)</th>
+                                    <th>Voltage (V)</th>
+                                    <th>Current (A)</th>
+                                    <th>Efficiency (%)</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="performanceLog">
+                                <tr>
+                                    <td>2025-12-17 13:43:19</td>
+                                    <td>3.27</td>
+                                    <td>385.2</td>
+                                    <td>8.5</td>
+                                    <td>96.8</td>
+                                    <td><span style="color: var(--success-color); font-weight: bold;">✓ Optimal</span></td>
+                                </tr>
+                                <tr>
+                                    <td>2025-12-17 13:42:19</td>
+                                    <td>3.25</td>
+                                    <td>384.8</td>
+                                    <td>8.45</td>
+                                    <td>96.7</td>
+                                    <td><span style="color: var(--success-color); font-weight: bold;">✓ Optimal</span></td>
+                                </tr>
+                                <tr>
+                                    <td>2025-12-17 13:41:19</td>
+                                    <td>3.29</td>
+                                    <td>385.6</td>
+                                    <td>8.53</td>
+                                    <td>96.9</td>
+                                    <td><span style="color: var(--success-color); font-weight: bold;">✓ Optimal</span></td>
+                                </tr>
+                                <tr>
+                                    <td>2025-12-17 13:40:19</td>
+                                    <td>3.24</td>
+                                    <td>384.5</td>
+                                    <td>8.42</td>
+                                    <td>96.6</td>
+                                    <td><span style="color: var(--success-color); font-weight: bold;">✓ Optimal</span></td>
+                                </tr>
+                                <tr>
+                                    <td>2025-12-17 13:39:19</td>
+                                    <td>3.28</td>
+                                    <td>385.4</td>
+                                    <td>8.51</td>
+                                    <td>96.8</td>
+                                    <td><span style="color: var(--success-color); font-weight: bold;">✓ Optimal</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer style="text-align: center; padding: 30px; margin-top: 50px; color: var(--text-secondary); border-top: 1px solid var(--border-color);">
+            <p>Cloud-IoT-5G-PV-MPPT Advanced Dashboard | Real-Time Monitoring System</p>
+            <p style="font-size: 0.9em; margin-top: 10px;">Last Updated: <span id="lastUpdate">2025-12-17 13:43:19 UTC</span></p>
+            <p style="font-size: 0.85em; margin-top: 20px; opacity: 0.7;">© 2025 Cinascorp. All Rights Reserved. | System Version 2.1.0</p>
+        </footer>
+    </div>
+
+    <script>
+        // ============================================
+        // REAL-TIME DATA SIMULATION & VISUALIZATION
+        // ============================================
+
+        // Initialize Charts
+        let powerChart, inverterChart, tempChart, networkChart, batteryChart, analyticsChart;
+
+        function initCharts() {
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#a0aac0',
+                            font: { size: 12 }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        ticks: { color: '#a0aac0' },
+                        grid: { color: '#2a3550' }
+                    },
+                    x: {
+                        ticks: { color: '#a0aac0' },
+                        grid: { color: '#2a3550' }
+                    }
+                }
+            };
+
+            // Power Chart
+            const powerCtx = document.getElementById('powerChart').getContext('2d');
+            powerChart = new Chart(powerCtx, {
+                type: 'line',
+                data: {
+                    labels: ['13:20', '13:25', '13:30', '13:35', '13:40', '13:43'],
+                    datasets: [{
+                        label: 'Power (kW)',
+                        data: [3.1, 3.18, 3.22, 3.25, 3.26, 3.27],
+                        borderColor: '#00ff66',
+                        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#00ff66'
+                    }]
+                },
+                options: { ...commonOptions }
+            });
+
+            // Inverter Chart
+            const inverterCtx = document.getElementById('inverterChart').getContext('2d');
+            inverterChart = new Chart(inverterCtx, {
+                type: 'line',
+                data: {
+                    labels: ['13:20', '13:25', '13:30', '13:35', '13:40', '13:43'],
+                    datasets: [
+                        {
+                            label: 'Grid Voltage (V)',
+                            data: [230.2, 230.3, 230.5, 230.4, 230.5, 230.5],
+                            borderColor: '#00ccff',
+                            backgroundColor: 'rgba(0, 204, 255, 0.1)',
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 3
+                        },
+                        {
+                            label: 'Grid Frequency (Hz)',
+                            data: [50.0, 50.05, 50.02, 50.0, 50.01, 50.0],
+                            borderColor: '#ff9900',
+                            backgroundColor: 'rgba(255, 153, 0, 0.1)',
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 3
+                        }
+                    ]
+                },
+                options: { ...commonOptions }
+            });
+
+            // Temperature Chart
+            const tempCtx = document.getElementById('tempChart').getContext('2d');
+            tempChart = new Chart(tempCtx, {
+                type: 'line',
+                data: {
+                    labels: ['13:20', '13:25', '13:30', '13:35', '13:40', '13:43'],
+                    datasets: [
+                        {
+                            label: 'Panel Temp (°C)',
+                            data: [50.5, 51.2, 51.8, 52.1, 52.2, 52.3],
+                            borderColor: '#ff3333',
+                            backgroundColor: 'rgba(255, 51, 51, 0.1)',
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 3
+                        },
+                        {
+                            label: 'Inverter Temp (°C)',
+                            data: [37.5, 37.8, 38.1, 38.3, 38.4, 38.5],
+                            borderColor: '#00ccff',
+                            backgroundColor: 'rgba(0, 204, 255, 0.1)',
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 3
+                        }
+                    ]
+                },
+                options: { ...commonOptions }
+            });
+
+            // Network Chart
+            const networkCtx = document.getElementById('networkChart').getContext('2d');
+            networkChart = new Chart(networkCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['DL Speed', 'UL Speed', 'Latency', 'RSRP', 'RSRQ'],
+                    datasets: [{
+                        label: 'Network Metrics (Normalized)',
+                        data: [524, 98, 12.5, 95, 88],
+                        backgroundColor: [
+                            'rgba(0, 102, 204, 0.7)',
+                            'rgba(0, 204, 102, 0.7)',
+                            'rgba(0, 204, 255, 0.7)',
+                            'rgba(255, 153, 0, 0.7)',
+                            'rgba(255, 102, 0, 0.7)'
+                        ],
+                        borderColor: [
+                            '#0066cc',
+                            '#00cc66',
+                            '#00ccff',
+                            '#ff9900',
+                            '#ff6600'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: { ...commonOptions }
+            });
+
+            // Battery Chart
+            const batteryCtx = document.getElementById('batteryChart').getContext('2d');
+            batteryChart = new Chart(batteryCtx, {
+                type: 'line',
+                data: {
+                    labels: ['13:20', '13:25', '13:30', '13:35', '13:40', '13:43'],
+                    datasets: [{
+                        label: 'SOC (%)',
+                        data: [72, 73.5, 75, 76.2, 77.1, 78],
+                        borderColor: '#00ff66',
+                        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#00ff66'
+                    }]
+                },
+                options: { ...commonOptions }
+            });
+
+            // Analytics Chart
+            const analyticsCtx = document.getElementById('analyticsChart').getContext('2d');
+            analyticsChart = new Chart(analyticsCtx, {
+                type: 'line',
+                data: {
+                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '23:59'],
+                    datasets: [
+                        {
+                            label: 'Energy Production (kWh)',
+                            data: [0.2, 0.5, 2.1, 3.8, 2.9, 0.8, 0.1],
+                            borderColor: '#00ff66',
+                            backgroundColor: 'rgba(0, 255, 102, 0.2)',
+                            tension: 0.3,
+                            fill: true,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#00ff66'
+                        },
+                        {
+                            label: 'System Efficiency (%)',
+                            data: [95.2, 96.0, 96.5, 96.8, 96.7, 96.3, 95.8],
+                            borderColor: '#0066cc',
+                            backgroundColor: 'rgba(0, 102, 204, 0.1)',
+                            tension: 0.3,
+                            fill: true,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#0066cc'
+                        }
+                    ]
+                },
+                options: { ...commonOptions }
+            });
+        }
+
+        // Real-Time Data Updates
+        function updateRealTimeData() {
+            const now = new Date();
+            const timeString = now.getUTCFullYear() + '-' + 
+                              String(now.getUTCMonth() + 1).padStart(2, '0') + '-' +
+                              String(now.getUTCDate()).padStart(2, '0') + ' ' +
+                              String(now.getUTCHours()).padStart(2, '0') + ':' +
+                              String(now.getUTCMinutes()).padStart(2, '0') + ':' +
+                              String(now.getUTCSeconds()).padStart(2, '0');
+            
+            document.getElementById('currentTime').textContent = timeString;
+            document.getElementById('lastUpdate').textContent = timeString + ' UTC';
+
+            // Simulate real-time data with slight variations
+            const baseValues = {
+                pvVoltage: 385.2,
+                pvCurrent: 8.5,
+                pvPower: 3.27,
+                pvEfficiency: 96.8,
+                gridVoltage: 230.5,
+                gridFrequency: 50.0,
+                gridCurrent: 14.2,
+                thd: 2.8,
+                panelTemp: 52.3,
+                inverterTemp: 38.5,
+                irradiance: 892,
+                humidity: 45,
+                batteryVoltage: 48.5,
+                batteryCurrent: 12.3,
+                socValue: 78
+            };
+
+            // Add random variations (±0.5% to ±2%)
+            Object.keys(baseValues).forEach(key => {
+                const variation = (Math.random() - 0.5) * 0.01 * baseValues[key];
+                const newValue = baseValues[key] + variation;
+                const element = document.getElementById(key);
+                if (element) {
+                    if (key === 'gridFrequency') {
+                        element.textContent = newValue.toFixed(2);
+                    } else if (key.includes('Temp') || key === 'humidity' || key === 'irradiance' || key === 'socValue') {
+                        element.textContent = newValue.toFixed(0);
+                    } else if (key.includes('Voltage') || key.includes('Current')) {
+                        element.textContent = newValue.toFixed(1);
+                    } else {
+                        element.textContent = newValue.toFixed(2);
+                    }
+                }
+            });
+
+            // Update SOC bar
+            const socVal = parseFloat(document.getElementById('socValue').textContent);
+            document.getElementById('socBar').style.width = socVal + '%';
+
+            // Update network metrics
+            const networkMetrics = {
+                rsrp: -95 + (Math.random() - 0.5) * 2,
+                dataRateDL: 524 + (Math.random() - 0.5) * 50,
+                dataRateUL: 98 + (Math.random() - 0.5) * 20,
+                latency: 12.5 + (Math.random() - 0.5) * 2,
+                packetLoss: 0.02 + (Math.random() - 0.5) * 0.01,
+                rsrq: -12 + (Math.random() - 0.5) * 2
+            };
+
+            document.getElementById('rsrp').textContent = networkMetrics.rsrp.toFixed(0) + ' dBm';
+            document.getElementById('dataRateDL').textContent = networkMetrics.dataRateDL.toFixed(0) + ' Mbps';
+            document.getElementById('dataRateUL').textContent = networkMetrics.dataRateUL.toFixed(0) + ' Mbps';
+            document.getElementById('latency').textContent = networkMetrics.latency.toFixed(1) + ' ms';
+            document.getElementById('packetLoss').textContent = networkMetrics.packetLoss.toFixed(3) + '%';
+            document.getElementById('rsrq').textContent = networkMetrics.rsrq.toFixed(0) + ' dB';
+        }
+
+        // MPPT Control Sliders
+        document.getElementById('dutyCycleSlider').addEventListener('input', function(e) {
+            document.getElementById('dutyCycleValue').textContent = e.target.value + '%';
+        });
+
+        document.getElementById('voltageRefSlider').addEventListener('input', function(e) {
+            document.getElementById('voltageRefValue').textContent = e.target.value + ' V';
+        });
+
+        // Fault Alert Close Buttons
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('fault-close')) {
+                e.target.closest('.fault-alert').remove();
+                updateFaultCount();
+            }
+        });
+
+        function updateFaultCount() {
+            const faultCount = document.querySelectorAll('.fault-alert').length;
+            document.getElementById('faultCount').textContent = faultCount + ' Active';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            updateRealTimeData();
+            setInterval(updateRealTimeData, 1000);
+        });
+
+        // WebSocket/Real-time connection simulation
+        console.log('Dashboard initialized | Cloud-IoT-5G-PV-MPPT v2.1.0');
+        console.log('Real-time data streaming: ACTIVE');
+        console.log('Network: 5G Connected | Signal: -95 dBm | Data Rate: 524 Mbps');
+    </script>
+</body>
+</html>
