@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud IoT 5G PV MPPT Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        header {
+            background-color: #0066cc;
+            color: white;
+            padding: 1rem;
+            width: 100%;
+            text-align: center;
+        }
+
+        main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        .section {
+            width: 90%;
+            max-width: 1200px;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            text-align: center;
+        }
+
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .control-button {
+            padding: 0.5rem 1rem;
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .control-button:hover {
+            background-color: #004d99;
+        }
+
+        @media (max-width: 600px) {
+            header {
+                font-size: smaller;
+            }
+        }
+    </style>
+
+    <script>
+        const ws = new WebSocket('wss://your-backend-endpoint');
+
+        ws.onopen = () => {
+            console.log('WebSocket is connected.');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            // Example: Update power metric
+            if (data.metrics) {
+                document.getElementById('power-metric').textContent = `${data.metrics.power} W`;
+                document.getElementById('latency-metric').textContent = `${data.metrics.latency} ms`;
+                document.getElementById('efficiency-metric').textContent = `${data.metrics.efficiency} %`;
+            }
+
+            if (data.predictions) {
+                document.getElementById('fault-detection').textContent = data.predictions.fault;
+                document.getElementById('optimization').textContent = data.predictions.optimization;
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket error', error);
+        };
+
+        function sendControlCommand(command) {
+            ws.send(JSON.stringify({ command }));
+            console.log(`Command ${command} sent.`);
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Advanced Dashboard: Cloud IoT 5G PV MPPT System</h1>
+    </header>
+
+    <main>
+        <section class="section">
+            <h2>Real-Time Metrics</h2>
+            <div class="metrics">
+                <div>
+                    <h3>Power</h3>
+                    <p id="power-metric">0 W</p>
+                </div>
+                <div>
+                    <h3>Latency</h3>
+                    <p id="latency-metric">0 ms</p>
+                </div>
+                <div>
+                    <h3>Efficiency</h3>
+                    <p id="efficiency-metric">0 %</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Neural Network Predictions</h2>
+            <p><strong>Fault Detection:</strong> <span id="fault-detection">None</span></p>
+            <p><strong>Optimization Suggestion:</strong> <span id="optimization">-</span></p>
+        </section>
+
+        <section class="section">
+            <h2>System Control Panel</h2>
+            <div class="control-panel">
+                <button class="control-button" onclick="sendControlCommand('start')">Start</button>
+                <button class="control-button" onclick="sendControlCommand('stop')">Stop</button>
+                <button class="control-button" onclick="sendControlCommand('optimize')">Optimize</button>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
